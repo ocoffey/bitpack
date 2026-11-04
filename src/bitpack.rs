@@ -4,7 +4,21 @@
 /// * `n`: A signed integer value
 /// * `width`: the width of a bit field
 pub fn fitss(n: i64, width: u64) -> bool {
-    false
+    if width == 0 {
+        return false;
+    }
+    let mut neg = false;
+    if n < 0 {
+        neg = true;
+    }
+    match n.highest_one() {
+        Some(idx) => if neg {
+            idx as u64 <= width
+        } else {
+            idx as u64 + 1 <= width
+        },
+        None => true,
+    }
 }
 
 /// Returns true iff the unsigned value `n` fits into `width` unsigned bits.
@@ -13,7 +27,13 @@ pub fn fitss(n: i64, width: u64) -> bool {
 /// * `n`: An usigned integer value
 /// * `width`: the width of a bit field
 pub fn fitsu(n: u64, width: u64) -> bool {
-    false
+    if width == 0 {
+        return false;
+    }
+    match n.highest_one() {
+        Some(idx) => idx as u64 <= width,
+        None => true,
+    }
 }
 
 /// Retrieve a signed value from an unsigned `word`,
@@ -73,6 +93,9 @@ pub fn getu(word: u64, width: u64, lsb: u64) -> Option<u64> {
 /// an `Option<u64>` which contains the desired value at the appropriate field, if possible
 /// If the value does not fit, returns `None`
 pub fn newu(word: u64, width: u64, lsb: u64, value: u64) -> Option<u64> {
+    if !fitsu(value, width) || width + lsb > 64 {
+        return None
+    }
     Some(0)
 }
 
@@ -93,5 +116,8 @@ pub fn newu(word: u64, width: u64, lsb: u64, value: u64) -> Option<u64> {
 /// If the value does not fit, returns `None`
 ///
 pub fn news(word: u64, width: u64, lsb: u64, value: i64) -> Option<u64> {
+    if !fitss(value, width) {
+        return None
+    }
     Some(0)
 }
