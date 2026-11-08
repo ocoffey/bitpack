@@ -4,8 +4,12 @@
 /// * `n`: A signed integer value
 /// * `width`: the width of a bit field
 pub fn fitss(n: i64, width: u64) -> bool {
+    let (neg, n) = match n.is_negative() {
+        true => (1, (n * -1) as u64),
+        false => (0, n as u64),
+    };
     // works equivalently to fitsu
-    fitsu(n.cast_unsigned(), width)
+    fitsu(n, width - neg)
 }
 
 /// Returns true iff the unsigned value `n` fits into `width` unsigned bits.
@@ -15,7 +19,7 @@ pub fn fitss(n: i64, width: u64) -> bool {
 /// * `width`: the width of a bit field
 pub fn fitsu(n: u64, width: u64) -> bool {
     match (width != 0, n.highest_one()) {
-        (true, Some(idx)) => idx as u64 <= width,
+        (true, Some(idx)) => (idx as u64) < width,
         (true, None) => true,
         (false, _) => false,
     }
@@ -38,7 +42,17 @@ pub fn fitsu(n: u64, width: u64) -> bool {
 /// or `None` if the field is impossible
 pub fn gets(word: u64, width: u64, lsb: u64) -> Option<i64> {
     match bitmask(width, lsb) {
-        Some(mask) => Some(((word & mask) >> lsb).cast_signed()),
+        Some(mask) => {
+            let mut extract = word & mask;
+            match extract.highest_one() == Some((width + lsb - 1) as u32) {
+                true => {
+                    extract &= !extract.isolate_highest_one();
+                    extract >>= lsb;
+                    Some(extract as i64 * -1)
+                },
+                false => Some((extract >> lsb) as i64),
+            }
+        },
         None => None,
     }
 }
@@ -68,28 +82,6 @@ pub fn getu(word: u64, width: u64, lsb: u64) -> Option<u64> {
     }
 }
 
-/// Given an unsigned 64-bit `word`, and an unsigned `value`,
-/// pack that `value` into `width` bits of the `word` starting at
-/// least-significant bit `lsb`, if possible.
-///
-/// # Arguments
-///
-/// * `word` - an arbitrary unsigned 64-bit word
-/// * `width` - a number of bits describing a field
-/// * `lsb` - the-least significant bit of a field
-/// * `value` - the unsigned value to store in the field
-///
-/// # Returns
-///
-/// an `Option<u64>` which contains the desired value at the appropriate field, if possible
-/// If the value does not fit, returns `None`
-pub fn newu(word: u64, width: u64, lsb: u64, value: u64) -> Option<u64> {
-    match bitmask_val(width, lsb, value) {
-        Some((mask, shiftval)) => Some(insert_val(word, mask, shiftval)),
-        None => None
-    }
-}
-
 /// Given an unsigned 64-bit `word`, and a signed `value`,
 /// pack that `value` into `width` bits of the `word` starting at
 /// least-significant bit `lsb`, if possible.
@@ -107,7 +99,36 @@ pub fn newu(word: u64, width: u64, lsb: u64, value: u64) -> Option<u64> {
 /// If the value does not fit, returns `None`
 ///
 pub fn news(word: u64, width: u64, lsb: u64, value: i64) -> Option<u64> {
-    match bitmask_val(width, lsb, value.cast_unsigned()) {
+    let (neg, mut value) = match value.is_negative() {
+        true => (true, (value * -1).cast_unsigned()),
+        false => (false, value.cast_unsigned()),
+    };
+    if neg {
+        value |= 1 << width;
+    }
+    match bitmask_val(width, lsb, value) {
+        Some((mask, shiftval)) => Some(insert_val(word, mask, shiftval)),
+        None => None
+    }
+}
+
+/// Given an unsigned 64-bit `word`, and an unsigned `value`,
+/// pack that `value` into `width` bits of the `word` starting at
+/// least-significant bit `lsb`, if possible.
+///
+/// # Arguments
+///
+/// * `word` - an arbitrary unsigned 64-bit word
+/// * `width` - a number of bits describing a field
+/// * `lsb` - the-least significant bit of a field
+/// * `value` - the unsigned value to store in the field
+///
+/// # Returns
+///
+/// an `Option<u64>` which contains the desired value at the appropriate field, if possible
+/// If the value does not fit, returns `None`
+pub fn newu(word: u64, width: u64, lsb: u64, value: u64) -> Option<u64> {
+    match bitmask_val(width, lsb, value) {
         Some((mask, shiftval)) => Some(insert_val(word, mask, shiftval)),
         None => None
     }
