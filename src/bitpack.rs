@@ -4,12 +4,14 @@
 /// * `n`: A signed integer value
 /// * `width`: the width of a bit field
 pub fn fitss(n: i64, width: u64) -> bool {
-    let (neg, n) = match n.is_negative() {
-        true => (1, (n * -1) as u64),
-        false => (0, n as u64),
+    let leftpad = 64 - width as u32;
+    let n = match (n.is_negative(), (n.leading_ones() > leftpad)) {
+        (true, true) => (n.cast_unsigned() << leftpad) >> leftpad,
+        (true, false) => return false,
+        (false, _) => n.cast_unsigned(),
     };
     // works equivalently to fitsu
-    fitsu(n, width - neg)
+    fitsu(n, width)
 }
 
 /// Returns true iff the unsigned value `n` fits into `width` unsigned bits.
@@ -45,15 +47,6 @@ pub fn gets(word: u64, width: u64, lsb: u64) -> Option<i64> {
         Some(mask) => {
             let leftpad = 64 - width - lsb;
             Some(((word & mask) << leftpad) as i64 >> (leftpad + lsb))
-            /*
-            match extract.highest_one() == Some((width + lsb - 1) as u32) {
-                true => {
-                    extract &= !extract.isolate_highest_one();
-                    extract >>= lsb;
-                    Some(extract as i64 * -1)
-                },
-                false => Some((extract >> lsb) as i64),
-            }*/
         },
         None => None,
     }
@@ -101,15 +94,11 @@ pub fn getu(word: u64, width: u64, lsb: u64) -> Option<u64> {
 /// If the value does not fit, returns `None`
 ///
 pub fn news(word: u64, width: u64, lsb: u64, value: i64) -> Option<u64> {
-    let (neg, mut value) = match value.is_negative() {
-        true => (true, (value * -1).cast_unsigned()),
-        false => (false, value.cast_unsigned()),
+    let leftpad = (64 - width) as u32;
+    let value = match fitss(value, width) {
+        true => (value.cast_unsigned() << leftpad) >> leftpad,
+        false => return None,
     };
-    if neg {
-        // highest_one will never panic, since value had to be negative
-        // to get here
-        value |= 1 << (value.highest_one().unwrap() + 1);
-    }
     match bitmask_val(width, lsb, value) {
         Some((mask, shiftval)) => Some(insert_val(word, mask, shiftval)),
         None => None
