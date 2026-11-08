@@ -43,7 +43,9 @@ pub fn fitsu(n: u64, width: u64) -> bool {
 pub fn gets(word: u64, width: u64, lsb: u64) -> Option<i64> {
     match bitmask(width, lsb) {
         Some(mask) => {
-            let mut extract = word & mask;
+            let leftpad = 64 - width - lsb;
+            Some(((word & mask) << leftpad) as i64 >> (leftpad + lsb))
+            /*
             match extract.highest_one() == Some((width + lsb - 1) as u32) {
                 true => {
                     extract &= !extract.isolate_highest_one();
@@ -51,7 +53,7 @@ pub fn gets(word: u64, width: u64, lsb: u64) -> Option<i64> {
                     Some(extract as i64 * -1)
                 },
                 false => Some((extract >> lsb) as i64),
-            }
+            }*/
         },
         None => None,
     }
@@ -104,7 +106,9 @@ pub fn news(word: u64, width: u64, lsb: u64, value: i64) -> Option<u64> {
         false => (false, value.cast_unsigned()),
     };
     if neg {
-        value |= 1 << width;
+        // highest_one will never panic, since value had to be negative
+        // to get here
+        value |= 1 << (value.highest_one().unwrap() + 1);
     }
     match bitmask_val(width, lsb, value) {
         Some((mask, shiftval)) => Some(insert_val(word, mask, shiftval)),
